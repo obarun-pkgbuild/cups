@@ -1,0 +1,184 @@
+# Maintainer: Eric Vidal <eric@obarun.org>
+# based on the original https://projects.archlinux.org/svntogit/packages.git/tree/trunk?h=packages/cups
+# 						Maintainer: Andreas Radke <andyrtr@archlinux.org>
+
+pkgbase="cups"
+pkgname=('libcups' 'cups')
+pkgver=2.2.4
+pkgrel=3
+arch=(x86_64)
+license=('GPL')
+url="https://www.cups.org/"
+makedepends=('libtiff' 'libpng' 'acl' 'pam' 'xdg-utils' 'krb5' 'gnutls'
+             'cups-filters' 'bc' 'colord' 'xinetd' 'gzip' 'autoconf' 'libusb' 'dbus' 
+             'avahi'  'hicolor-icon-theme' 'inetutils' 'libpaper' 'valgrind')
+optdepends=('cups-s6serv: cups s6 service'
+			'cups-s6rcserv: cups s6-rc service'
+			'cups-runitserv: cups runit service')
+source=(https://github.com/apple/cups/releases/download/v${pkgver}/cups-${pkgver}-source.tar.gz
+        cups.logrotate cups.pam
+        # improve build and linking
+        cups-no-export-ssllibs.patch
+        cups-no-gcrypt.patch
+        cups-no-gzip-man.patch
+        cups-1.6.2-statedir.patch
+        cups-fix-install-perms.patch
+        cupsGetDests.diff)
+
+sha256sums=('596d4db72651c335469ae5f37b0da72ac9f97d73e30838d787065f559dea98cc'
+            'd87fa0f0b5ec677aae34668f260333db17ce303aa1a752cba5f8e72623d9acf9'
+            '57dfd072fd7ef0018c6b0a798367aac1abb5979060ff3f9df22d1048bb71c0d5'
+            'ff3eb0782af0405f5dafe89e04b1b4ea7a49afc5496860d724343bd04f375832'
+            '1423673e16e374ed372c5b69aebc785b6674bf40601c74a5c08454f672ffa7f1'
+            'b8fc2e3bc603495f0278410350ea8f0161d9d83719feb64f573b63430cb4800b'
+            '23349c96f2f7aeb7d48e3bcd35a969f5d5ac8f55a032b0cfaa0a03d7e37ea9af'
+            '2496b683920417c922d58c1f70807f7a0f0c818db9ce75fe182104bd4484027b'
+            'fd3bbd14df3deed24a7408ce01fa0998b5c0e98bc925aa41e8b5619e813cc016')
+            
+validpgpkeys=('6DD4217456569BA711566AC7F06E8FDE7B45DAAC') # Eric Vidal
+
+prepare() {
+
+  cd ${pkgbase}-${pkgver}
+  
+  # improve build and linking
+  # Do not export SSL libs in cups-config
+  patch -Np1 -i ${srcdir}/cups-no-export-ssllibs.patch
+  # https://www.cups.org/str.php?L4399
+  patch -Np1 -i ${srcdir}/cups-no-gcrypt.patch
+  # don't zip man pages in make install, let makepkg do that / Fedora
+  patch -Np1 -i ${srcdir}/cups-no-gzip-man.patch
+  # move /var/run -> /run for pid file
+  patch -Np1 -i ${srcdir}/cups-1.6.2-statedir.patch
+  # fix permissions on some files (by Gentoo) - alternative: cups-0755.patch by FC
+  patch -Np0 -i ${srcdir}/cups-fix-install-perms.patch
+
+  # bug fixes 
+  # set MaxLogSize to 0 to prevent using cups internal log rotation
+  sed -i -e '5i\ ' conf/cupsd.conf.in
+  sed -i -e '6i# Disable cups internal logging - use logrotate instead' conf/cupsd.conf.in
+  sed -i -e '7iMaxLogSize 0' conf/cupsd.conf.in
+  
+  # upstream fix for https://bugs.archlinux.org/task/54695
+  patch -Np1 -i ../cupsGetDests.diff
+
+  # Rebuild configure script for not zipping man-pages.
+  aclocal -I config-scripts
+  autoconf -I config-scripts
+}
+
+build() {
+  cd ${pkgbase}-${pkgver}
+  ./configure --prefix=/usr \
+     --sysconfdir=/etc \
+     --localstatedir=/var \
+     --sbindir=/usr/bin \
+     --libdir=/usr/lib \
+     --with-logdir=/var/log/cups \
+     --with-docdir=/usr/share/cups/doc \
+     --with-cups-user=daemon \
+     --with-cups-group=lp \
+     --enable-pam=yes \
+     --enable-raw-printing \
+     --enable-dbus \
+     --with-dbusdir=/etc/dbus-1 \
+     --enable-ssl=yes \
+     --enable-threads \
+     --enable-avahi\
+     --enable-libpaper \
+     --with-php=/usr/bin/php-cgi \
+     --disable-systemd \
+     --with-optim="$CFLAGS" #--help
+  make
+}
+
+check() {
+  cd ${pkgbase}-${pkgver}
+  #make -k check || /bin/true
+}
+
+package_libcups() {
+pkgdesc="The CUPS Printing System - client libraries and headers"
+depends=('gnutls' 'libtiff>=4.0.0' 'libpng>=1.5.7' 'krb5' 'avahi' 'libusb')
+
+
+  cd ${pkgbase}-${pkgver}
+  make BUILDROOT=${pkgdir} install-headers install-libs
+  # put this into the libs pkg to make other software find the libs(no pkg-config file included)
+  mkdir -p ${pkgdir}/usr/bin 
+  install -m755 ${srcdir}/${pkgbase}-${pkgver}/cups-config ${pkgdir}/usr/bin/cups-config
+  
+  # install client.conf man page and config file
+  install -dm755 ${pkgdir}/usr/share/man/man5
+  install -Dm644  ${srcdir}/${pkgbase}-${pkgver}/man/client.conf.5 ${pkgdir}/usr/share/man/man5/
+  install -dm755 -g lp ${pkgdir}/etc/cups
+  touch ${pkgdir}/etc/cups/client.conf
+  echo "# see 'man client.conf'" >> ${pkgdir}/etc/cups/client.conf
+  echo "ServerName /run/cups/cups.sock #  alternative: ServerName hostname-or-ip-address[:port] of a remote server" >> ${pkgdir}/etc/cups/client.conf
+  chgrp -R lp ${pkgdir}/etc/cups
+}
+
+package_cups() {
+pkgdesc="The CUPS Printing System - daemon package"
+install=cups.install
+backup=(etc/cups/cupsd.conf
+        etc/cups/snmp.conf
+        etc/cups/printers.conf
+        etc/cups/classes.conf
+        etc/cups/cups-files.conf
+        etc/cups/subscriptions.conf
+        etc/dbus-1/system.d/cups.conf
+        etc/logrotate.d/cups
+        etc/pam.d/cups)
+depends=('acl' 'pam' "libcups>=${pkgver}" 'cups-filters' 'bc'
+         'dbus' 'libpaper' 'hicolor-icon-theme')
+optdepends=('xdg-utils: xdg .desktop file support'
+			'colord: for ICC color profile support'
+			'cups-s6serv: cups s6 service'
+			'cups-s6rcserv: cups s6-rc service'
+			'cups-runitserv: cups runit service')
+
+  cd ${pkgbase}-${pkgver}
+  make BUILDROOT=${pkgdir} install-data install-exec
+
+  # this one we ship in the libcups pkg
+  rm -f ${pkgdir}/usr/bin/cups-config
+
+  # kill the sysv stuff
+  rm -rf ${pkgdir}/etc/rc*.d
+  rm -rf ${pkgdir}/etc/init.d
+  install -D -m644 ../cups.logrotate ${pkgdir}/etc/logrotate.d/cups
+  install -D -m644 ../cups.pam ${pkgdir}/etc/pam.d/cups
+  
+  # fix perms on /var/spool and /etc
+  chmod 755 ${pkgdir}/var/spool
+  chmod 755 ${pkgdir}/etc
+
+  # install ssl directory where to store the certs, solves some samba issues
+  install -dm700 -g lp ${pkgdir}/etc/cups/ssl
+  # remove directory from package, it will be recreated at each server start
+  rm -rf ${pkgdir}/run
+
+  # install some more configuration files that will get filled by cupsd
+  touch ${pkgdir}/etc/cups/printers.conf
+  touch ${pkgdir}/etc/cups/classes.conf
+  touch ${pkgdir}/etc/cups/subscriptions.conf 
+  chgrp -R lp ${pkgdir}/etc/cups
+  
+  # fix .desktop file
+  sed -i 's|^Exec=htmlview http://localhost:631/|Exec=xdg-open http://localhost:631/|g' ${pkgdir}/usr/share/applications/cups.desktop
+  
+  # compress some driver files, adopted from Fedora
+  find ${pkgdir}/usr/share/cups/model -name "*.ppd" | xargs gzip -n9f
+  
+  # remove client.conf man page
+  rm -f ${pkgdir}/usr/share/man/man5/client.conf.5
+  
+
+  # comment out all conversion rules which use any of the removed filters that are now part of cups-filters
+  perl -p -i -e 's:^(.*\s+bannertops\s*)$:#\1:' $pkgdir/usr/share/cups/mime/mime.convs
+
+  
+  # comment out unnecessary PageLogFormat entry
+  sed -i -e 's:PageLogFormat:#PageLogFormat:' $pkgdir/etc/cups/cupsd.conf*
+}
