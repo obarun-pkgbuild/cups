@@ -12,9 +12,6 @@ url="https://www.cups.org/"
 makedepends=('libtiff' 'libpng' 'acl' 'pam' 'xdg-utils' 'krb5' 'gnutls'
              'cups-filters' 'bc' 'colord' 'xinetd' 'gzip' 'autoconf' 'libusb' 'dbus' 
              'avahi'  'hicolor-icon-theme' 'inetutils' 'libpaper' 'valgrind')
-optdepends=('cups-s6serv: cups s6 service'
-			'cups-s6rcserv: cups s6-rc service'
-			'cups-runitserv: cups runit service')
 source=(https://github.com/apple/cups/releases/download/v${pkgver}/cups-${pkgver}-source.tar.gz
         cups.logrotate cups.pam
         # improve build and linking
