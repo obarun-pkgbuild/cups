@@ -5,7 +5,7 @@
 pkgbase="cups"
 pkgname=('libcups' 'cups')
 pkgver=2.2.6
-pkgrel=3
+pkgrel=5
 arch=(x86_64)
 license=('GPL')
 url="https://www.cups.org/"
@@ -13,7 +13,10 @@ makedepends=('libtiff' 'libpng' 'acl' 'pam' 'xdg-utils' 'krb5' 'gnutls'
              'cups-filters' 'bc' 'colord' 'xinetd' 'gzip' 'autoconf' 'libusb' 'dbus' 
              'avahi'  'hicolor-icon-theme' 'inetutils' 'libpaper' 'valgrind')
 source=(https://github.com/apple/cups/releases/download/v${pkgver}/cups-${pkgver}-source.tar.gz
-        cups.logrotate cups.pam
+        cups.logrotate 
+        cups.pam
+        cups.sysusers 
+        guid.patch
         # improve build and linking
         cups-no-export-ssllibs.patch
         cups-no-gzip-man.patch
@@ -39,7 +42,9 @@ prepare() {
   patch -Np1 -i ${srcdir}/cups-no-gzip-man.patch
   # move /var/run -> /run for pid file
   patch -Np1 -i ${srcdir}/cups-1.6.2-statedir.patch
-
+  # FS#56818 - https://github.com/apple/cups/issues/5236
+  patch -Np1 -i ${srcdir}/guid.patch
+  
   # bug fixes 
   # set MaxLogSize to 0 to prevent using cups internal log rotation
   sed -i -e '5i\ ' conf/cupsd.conf.in
@@ -60,9 +65,9 @@ build() {
      --libdir=/usr/lib \
      --with-logdir=/var/log/cups \
      --with-docdir=/usr/share/cups/doc \
-     --with-exec-file-perm=0755 \
-     --with-cups-user=daemon \
-     --with-cups-group=lp \
+     --with-exe-file-perm=0755 \
+     --with-cups-user=209 \
+     --with-cups-group=209 \
      --enable-pam=yes \
      --enable-raw-printing \
      --enable-dbus \
@@ -92,15 +97,6 @@ depends=('gnutls' 'libtiff>=4.0.0' 'libpng>=1.5.7' 'krb5' 'avahi' 'libusb')
   # put this into the libs pkg to make other software find the libs(no pkg-config file included)
   mkdir -p ${pkgdir}/usr/bin 
   install -m755 ${srcdir}/${pkgbase}-${pkgver}/cups-config ${pkgdir}/usr/bin/cups-config
-  
-  # install client.conf man page and config file
-  install -dm755 ${pkgdir}/usr/share/man/man5
-  install -Dm644  ${srcdir}/${pkgbase}-${pkgver}/man/client.conf.5 ${pkgdir}/usr/share/man/man5/
-  install -dm755 -g lp ${pkgdir}/etc/cups
-  touch ${pkgdir}/etc/cups/client.conf
-  echo "# see 'man client.conf'" >> ${pkgdir}/etc/cups/client.conf
-  echo "ServerName /run/cups/cups.sock #  alternative: ServerName hostname-or-ip-address[:port] of a remote server" >> ${pkgdir}/etc/cups/client.conf
-  chgrp -R lp ${pkgdir}/etc/cups
 }
 
 package_cups() {
@@ -118,10 +114,7 @@ backup=(etc/cups/cupsd.conf
 depends=('acl' 'pam' "libcups>=${pkgver}" 'cups-filters' 'bc'
          'dbus' 'libpaper' 'hicolor-icon-theme')
 optdepends=('xdg-utils: xdg .desktop file support'
-			'colord: for ICC color profile support'
-			'cups-s6serv: cups s6 service'
-			'cups-s6rcserv: cups s6-rc service'
-			'cups-runitserv: cups runit service')
+			'colord: for ICC color profile support')
 
   cd ${pkgbase}-${pkgver}
   make BUILDROOT=${pkgdir} install-data install-exec
@@ -138,9 +131,14 @@ optdepends=('xdg-utils: xdg .desktop file support'
   # fix perms on /var/spool and /etc
   chmod 755 ${pkgdir}/var/spool
   chmod 755 ${pkgdir}/etc
+  
+  # use cups group FS#36769
+  install -Dm644 "$srcdir"/cups.sysusers "${pkgdir}/usr/lib/sysusers.d/$pkgname.conf"
+  sed -i "s:#User 209:User 209:" ${pkgdir}/etc/cups/cups-files.conf{,.default}
+  sed -i "s:#Group 209:Group 209:" ${pkgdir}/etc/cups/cups-files.conf{,.default}
 
   # install ssl directory where to store the certs, solves some samba issues
-  install -dm700 -g lp ${pkgdir}/etc/cups/ssl
+  install -dm700 -g 209 ${pkgdir}/etc/cups/ssl
   # remove directory from package, it will be recreated at each server start
   rm -rf ${pkgdir}/run
 
