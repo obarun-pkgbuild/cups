@@ -4,8 +4,8 @@
 
 pkgbase="cups"
 pkgname=('libcups' 'cups')
-pkgver=2.2.6
-pkgrel=5
+pkgver=2.2.7
+pkgrel=2
 arch=(x86_64)
 license=('GPL')
 url="https://www.cups.org/"
@@ -22,9 +22,11 @@ source=(https://github.com/apple/cups/releases/download/v${pkgver}/cups-${pkgver
         cups-no-gzip-man.patch
         cups-1.6.2-statedir.patch)
 
-sha256sums=('40385778c2b3bdf55030d1c999734e22774c79e3425d91339ce677825620169b'
+sha256sums=('3c4b637b737077565ccdfbd5f61785d03f49461ae736fcc2c0ffaf41d2c6ea6a'
             'd87fa0f0b5ec677aae34668f260333db17ce303aa1a752cba5f8e72623d9acf9'
             '57dfd072fd7ef0018c6b0a798367aac1abb5979060ff3f9df22d1048bb71c0d5'
+            '06173dfaea37bdd9b39b3e09aba98c34ae7112a2f521db45a688907d8848caa2'
+            'd4537526c1e075866ae22ad263da000fc2a592d36c26b79a459a1cfdade2bb2d'
             'ff3eb0782af0405f5dafe89e04b1b4ea7a49afc5496860d724343bd04f375832'
             'b8fc2e3bc603495f0278410350ea8f0161d9d83719feb64f573b63430cb4800b'
             '23349c96f2f7aeb7d48e3bcd35a969f5d5ac8f55a032b0cfaa0a03d7e37ea9af')
