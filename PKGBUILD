@@ -5,7 +5,7 @@
 pkgbase="cups"
 pkgname=('libcups' 'cups')
 pkgver=2.2.7
-pkgrel=2
+pkgrel=3
 arch=(x86_64)
 license=('GPL')
 url="https://www.cups.org/"
@@ -20,7 +20,8 @@ source=(https://github.com/apple/cups/releases/download/v${pkgver}/cups-${pkgver
         # improve build and linking
         cups-no-export-ssllibs.patch
         cups-no-gzip-man.patch
-        cups-1.6.2-statedir.patch)
+        cups-1.6.2-statedir.patch
+        auth-workaround-for-certain-web-browsers.patch)
 
 sha256sums=('3c4b637b737077565ccdfbd5f61785d03f49461ae736fcc2c0ffaf41d2c6ea6a'
             'd87fa0f0b5ec677aae34668f260333db17ce303aa1a752cba5f8e72623d9acf9'
@@ -29,7 +30,8 @@ sha256sums=('3c4b637b737077565ccdfbd5f61785d03f49461ae736fcc2c0ffaf41d2c6ea6a'
             'd4537526c1e075866ae22ad263da000fc2a592d36c26b79a459a1cfdade2bb2d'
             'ff3eb0782af0405f5dafe89e04b1b4ea7a49afc5496860d724343bd04f375832'
             'b8fc2e3bc603495f0278410350ea8f0161d9d83719feb64f573b63430cb4800b'
-            '23349c96f2f7aeb7d48e3bcd35a969f5d5ac8f55a032b0cfaa0a03d7e37ea9af')
+            '23349c96f2f7aeb7d48e3bcd35a969f5d5ac8f55a032b0cfaa0a03d7e37ea9af'
+            'e5ad0e967c2ae9a9780211acb41980e4aa203df1dacff49d14d75a6ab6c8b8ed')
             
 validpgpkeys=('6DD4217456569BA711566AC7F06E8FDE7B45DAAC') # Eric Vidal
 
@@ -52,7 +54,10 @@ prepare() {
   sed -i -e '5i\ ' conf/cupsd.conf.in
   sed -i -e '6i# Disable cups internal logging - use logrotate instead' conf/cupsd.conf.in
   sed -i -e '7iMaxLogSize 0' conf/cupsd.conf.in
-  
+ 
+  # https://github.com/apple/cups/issues/5289
+  patch -Np1 -i ${srcdir}/auth-workaround-for-certain-web-browsers.patch
+ 
   # Rebuild configure script for not zipping man-pages.
   aclocal -I config-scripts
   autoconf -I config-scripts
