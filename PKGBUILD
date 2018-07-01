@@ -4,8 +4,8 @@
 
 pkgbase="cups"
 pkgname=('libcups' 'cups')
-pkgver=2.2.7
-pkgrel=3
+pkgver=2.2.8
+pkgrel=4
 arch=(x86_64)
 license=('GPL')
 url="https://www.cups.org/"
@@ -21,9 +21,9 @@ source=(https://github.com/apple/cups/releases/download/v${pkgver}/cups-${pkgver
         cups-no-export-ssllibs.patch
         cups-no-gzip-man.patch
         cups-1.6.2-statedir.patch
-        auth-workaround-for-certain-web-browsers.patch)
+        cups-2.2.8-5325.patch)
 
-sha256sums=('3c4b637b737077565ccdfbd5f61785d03f49461ae736fcc2c0ffaf41d2c6ea6a'
+sha256sums=('3968fc1d26fc48727508db1c1380e36c6694ab90177fd6920aec5f6cc73af9e4'
             'd87fa0f0b5ec677aae34668f260333db17ce303aa1a752cba5f8e72623d9acf9'
             '57dfd072fd7ef0018c6b0a798367aac1abb5979060ff3f9df22d1048bb71c0d5'
             '06173dfaea37bdd9b39b3e09aba98c34ae7112a2f521db45a688907d8848caa2'
@@ -31,7 +31,7 @@ sha256sums=('3c4b637b737077565ccdfbd5f61785d03f49461ae736fcc2c0ffaf41d2c6ea6a'
             'ff3eb0782af0405f5dafe89e04b1b4ea7a49afc5496860d724343bd04f375832'
             'b8fc2e3bc603495f0278410350ea8f0161d9d83719feb64f573b63430cb4800b'
             '23349c96f2f7aeb7d48e3bcd35a969f5d5ac8f55a032b0cfaa0a03d7e37ea9af'
-            'e5ad0e967c2ae9a9780211acb41980e4aa203df1dacff49d14d75a6ab6c8b8ed')
+            'f067a6e49b8e2ab27c64f304150e805fff7d1f142653130efe26405a8c8ee8ac')
             
 validpgpkeys=('6DD4217456569BA711566AC7F06E8FDE7B45DAAC') # Eric Vidal
 
@@ -48,15 +48,15 @@ prepare() {
   patch -Np1 -i ${srcdir}/cups-1.6.2-statedir.patch
   # FS#56818 - https://github.com/apple/cups/issues/5236
   patch -Np1 -i ${srcdir}/guid.patch
-  
+
+  # https://github.com/apple/cups/issues/5325
+  patch -Np1 -i ${srcdir}/cups-2.2.8-5325.patch
+
   # bug fixes 
   # set MaxLogSize to 0 to prevent using cups internal log rotation
   sed -i -e '5i\ ' conf/cupsd.conf.in
   sed -i -e '6i# Disable cups internal logging - use logrotate instead' conf/cupsd.conf.in
   sed -i -e '7iMaxLogSize 0' conf/cupsd.conf.in
- 
-  # https://github.com/apple/cups/issues/5289
-  patch -Np1 -i ${srcdir}/auth-workaround-for-certain-web-browsers.patch
  
   # Rebuild configure script for not zipping man-pages.
   aclocal -I config-scripts
